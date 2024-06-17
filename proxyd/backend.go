@@ -373,10 +373,6 @@ func NewBackend(
 	return backend
 }
 
-func (b *Backend) GetBlockHeightZeroSlidingWindowLength() time.Duration {
-	return b.blockHeightZeroSlidingWindowLength
-}
-
 func (b *Backend) GetBlockHeightZeroThreshold() float64 {
 	return b.maxBlockHeightZeroThreshold
 }
@@ -749,7 +745,7 @@ func sortBatchRPCResponse(req []*RPCReq, res []*RPCRes) {
 
 // BlockHeightZeroRate returns the error rate of getting block height zero
 func (b *Backend) BlockHeightZeroErrorRate() float64 {
-	seconds := float64(b.GetBlockHeightZeroSlidingWindowLength() / time.Second)
+	seconds := float64(b.GetBlockHeightZeroSlidingWindow().WindowLength() / time.Second)
 	infractions := b.blockHeightZeroSlidingWindow.Count()
 	var bhZeroErrorRate float64 = 0
 	if infractions != 0 {

@@ -65,21 +65,21 @@ func setupBlockHeightZero(t *testing.T) (map[string]*nodeContext, *proxyd.Backen
 	require.Equal(t, 2, len(bg.Backends))
 
 	// Check backend default values are non zero
-	require.Equal(t, 60*time.Second, bg.Backends[0].GetBlockHeightZeroSlidingWindowLength())
+	require.Equal(t, 60*time.Second, bg.Backends[0].GetBlockHeightZeroSlidingWindow().WindowLength())
 	require.Equal(t, float64(0.1), bg.Backends[0].GetBlockHeightZeroThreshold())
 
 	// Check custom values can be applied
-	require.Equal(t, 70*time.Second, bg.Backends[1].GetBlockHeightZeroSlidingWindowLength())
+	require.Equal(t, 70*time.Second, bg.Backends[1].GetBlockHeightZeroSlidingWindow().WindowLength())
 	require.Equal(t, float64(0.5), bg.Backends[1].GetBlockHeightZeroThreshold())
 
 	// Create a New Sliding Window and maintain pointer to clock
 	clock := sw.NewAdjustableClock(ts("2023-04-21 15:00:00"))
 	sw1 := sw.NewSlidingWindow(
-		sw.WithWindowLength(bg.Backends[0].GetBlockHeightZeroSlidingWindowLength()),
+		sw.WithWindowLength(bg.Backends[0].GetBlockHeightZeroSlidingWindow().WindowLength()),
 		sw.WithClock(clock))
 
 	sw2 := sw.NewSlidingWindow(
-		sw.WithWindowLength(bg.Backends[1].GetBlockHeightZeroSlidingWindowLength()),
+		sw.WithWindowLength(bg.Backends[1].GetBlockHeightZeroSlidingWindow().WindowLength()),
 		sw.WithClock(clock))
 
 	bg.Backends[0].Override(proxyd.WithBlockHeightZeroSlidingWindow(sw1))
@@ -188,7 +188,7 @@ func TestBlockHeightZero(t *testing.T) {
 			require.Equal(t, float64(1), nodes["node1"].backend.GetBlockHeightZeroSlidingWindow().Avg())
 			require.False(t, bg.Consensus.IsBanned(nodes["node1"].backend))
 			require.False(t, bg.Consensus.IsBanned(nodes["node2"].backend))
-			addTimeToBackend(nodes["node1"].backend.GetBlockHeightZeroSlidingWindowLength() + time.Second)
+			addTimeToBackend(nodes["node1"].backend.GetBlockHeightZeroSlidingWindow().WindowLength() + time.Second)
 		}
 		require.False(t, bg.Consensus.IsBanned(nodes["node1"].backend))
 		require.False(t, bg.Consensus.IsBanned(nodes["node2"].backend))

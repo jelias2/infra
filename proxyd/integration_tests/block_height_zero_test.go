@@ -154,8 +154,8 @@ func TestBlockHeightZero(t *testing.T) {
 			sw.WithBucketSize(time.Second),
 			sw.WithClock(clock))
 
-		bg.Backends[0].SetBlockHeightZeroSlidingWindow(sw1)
-		bg.Backends[1].SetBlockHeightZeroSlidingWindow(sw2)
+		bg.Backends[0].Override(proxyd.WithBlockHeightZeroSlidingWindow(sw1))
+		bg.Backends[1].Override(proxyd.WithBlockHeightZeroSlidingWindow(sw2))
 	}
 
 	override := func(node string, method string, block string, response string) {
@@ -184,8 +184,8 @@ func TestBlockHeightZero(t *testing.T) {
 		overrideBlock("node1", "latest", "0x0")
 		for i := 0; i < 6; i++ {
 			update()
-			require.Equal(t, uint(1), nodes["node1"].backend.GetBlockHeightZeroSlidingWindowCount())
-			require.Equal(t, float64(1), nodes["node1"].backend.GetBlockHeightZeroSlidingWindowAvg())
+			require.Equal(t, uint(1), nodes["node1"].backend.GetBlockHeightZeroSlidingWindow().Count())
+			require.Equal(t, float64(1), nodes["node1"].backend.GetBlockHeightZeroSlidingWindow().Avg())
 			require.False(t, bg.Consensus.IsBanned(nodes["node1"].backend))
 			require.False(t, bg.Consensus.IsBanned(nodes["node2"].backend))
 			addTimeToBackend(nodes["node1"].backend.GetBlockHeightZeroSlidingWindowLength() + time.Second)

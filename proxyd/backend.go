@@ -375,23 +375,12 @@ func (b *Backend) GetBlockHeightZeroSlidingWindowLength() time.Duration {
 	return b.blockHeightZeroSlidingWindowLength
 }
 
-func (b *Backend) GetBlockHeightZeroSlidingWindowCount() uint {
-	return b.blockHeightZeroSlidingWindow.Count()
-}
-func (b *Backend) GetBlockHeightZeroSlidingWindowAvg() float64 {
-	return b.blockHeightZeroSlidingWindow.Avg()
-}
-
 func (b *Backend) GetBlockHeightZeroThreshold() float64 {
 	return b.maxBlockHeightZeroThreshold
 }
 
 func (b *Backend) GetBlockHeightZeroSlidingWindow() *sw.AvgSlidingWindow {
 	return b.blockHeightZeroSlidingWindow
-}
-
-func (b *Backend) SetBlockHeightZeroSlidingWindow(sw *sw.AvgSlidingWindow) {
-	b.blockHeightZeroSlidingWindow = sw
 }
 
 func (b *Backend) Override(opts ...BackendOpt) {
@@ -757,9 +746,9 @@ func sortBatchRPCResponse(req []*RPCReq, res []*RPCRes) {
 }
 
 // BlockHeightZeroRate returns the error rate of getting block height zero
-func (b *Backend) BlockHeightZeroErrorRate() (errorRate float64) {
+func (b *Backend) BlockHeightZeroErrorRate() float64 {
 	seconds := float64(b.GetBlockHeightZeroSlidingWindowLength() / time.Second)
-	infractions := b.GetBlockHeightZeroSlidingWindowCount()
+	infractions := b.blockHeightZeroSlidingWindow.Count()
 	var bhZeroErrorRate float64 = 0
 	if infractions != 0 {
 		bhZeroErrorRate = float64(infractions) / seconds

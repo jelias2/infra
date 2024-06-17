@@ -71,9 +71,6 @@ func NewSlidingWindow(opts ...SlidingWindowOpts) *AvgSlidingWindow {
 	}
 	if sw.clock == nil {
 		sw.clock = NewDefaultClock()
-		// // TODO: Need to fix clock so it can an interface
-		// // Cannot have pointer to an interface, is the issue
-		// sw.clock = NewAdjustableClock(time.Now())
 	}
 	return sw
 }

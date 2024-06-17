@@ -16,11 +16,9 @@ import (
 
 type bhZeroNodeContext struct {
 	// NOTE: maybe reuse the node context from consensus test here
-	backend      *proxyd.Backend   // this is the actual backend impl in proxyd
-	mockBackend  *MockBackend      // this is the fake backend that we can use to mock responses
-	handler      *ms.MockedHandler // this is where we control the state of mocked responses
-	bhZeroWindow *sw.AvgSlidingWindow
-	clock        *sw.AdjustableClock // this is where we control backend time
+	backend     *proxyd.Backend   // this is the actual backend impl in proxyd
+	mockBackend *MockBackend      // this is the fake backend that we can use to mock responses
+	handler     *ms.MockedHandler // this is where we control the state of mocked responses
 }
 
 // ts is a convenient method that must parse a time.Time from a string in format `"2006-01-02 15:04:05"`
@@ -94,20 +92,17 @@ func setupBlockHeightZero(t *testing.T) (map[string]*bhZeroNodeContext, *proxyd.
 	bg.Backends[0].Override(proxyd.WithBlockHeightZeroSlidingWindow(sw1))
 	bg.Backends[1].Override(proxyd.WithBlockHeightZeroSlidingWindow(sw2))
 
-	// convenient mapping to access the nodes, and sliding windows by name
+	// convenient mapping to access the nodes
 	nodes := map[string]*bhZeroNodeContext{
 		"node1": {
-			mockBackend:  node1,
-			backend:      bg.Backends[0],
-			handler:      &h1,
-			bhZeroWindow: bg.Backends[0].GetBlockHeightZeroSlidingWindow(),
+			mockBackend: node1,
+			backend:     bg.Backends[0],
+			handler:     &h1,
 		},
 		"node2": {
-			mockBackend:  node2,
-			backend:      bg.Backends[1],
-			handler:      &h2,
-			bhZeroWindow: bg.Backends[1].GetBlockHeightZeroSlidingWindow(),
-			clock:        clock,
+			mockBackend: node2,
+			backend:     bg.Backends[1],
+			handler:     &h2,
 		},
 	}
 
@@ -116,7 +111,6 @@ func setupBlockHeightZero(t *testing.T) (map[string]*bhZeroNodeContext, *proxyd.
 
 func TestBlockHeightZero(t *testing.T) {
 	nodes, bg, _, shutdown, c1 := setupBlockHeightZero(t)
-	c1.Set(ts("2023-04-25 13:33:33"))
 	defer nodes["node1"].mockBackend.Close()
 	defer nodes["node2"].mockBackend.Close()
 	defer shutdown()
@@ -151,28 +145,24 @@ func TestBlockHeightZero(t *testing.T) {
 		}
 		bg.Consensus.ClearListeners()
 		bg.Consensus.Reset()
-		b1 := nodes["node1"]
-		b2 := nodes["node2"]
 
 		require.False(t, bg.Consensus.IsBanned(nodes["node1"].backend))
 		require.False(t, bg.Consensus.IsBanned(nodes["node2"].backend))
 
-		now := ts("2023-04-21 15:04:00")
-		// Clear the sliding windows
-		c1.Set(now)
-		b1.bhZeroWindow = sw.NewSlidingWindow(
+		// Reset and clear the sliding windows
+		c1.Set(ts("2023-04-21 15:04:00"))
+		sw1 := sw.NewSlidingWindow(
 			sw.WithWindowLength(60*time.Second),
 			sw.WithBucketSize(time.Second),
 			sw.WithClock(c1))
 
-		b2.bhZeroWindow = sw.NewSlidingWindow(
+		sw2 := sw.NewSlidingWindow(
 			sw.WithWindowLength(60*time.Second),
 			sw.WithBucketSize(time.Second),
 			sw.WithClock(c1))
 
-		bg.Backends[0].SetBlockHeightZeroSlidingWindow(b1.bhZeroWindow)
-		bg.Backends[1].SetBlockHeightZeroSlidingWindow(b2.bhZeroWindow)
-		c1.Set(ts("2023-04-25 12:22:22"))
+		bg.Backends[0].SetBlockHeightZeroSlidingWindow(sw1)
+		bg.Backends[1].SetBlockHeightZeroSlidingWindow(sw2)
 	}
 
 	override := func(node string, method string, block string, response string) {
@@ -220,7 +210,6 @@ func TestBlockHeightZero(t *testing.T) {
 				require.True(t, bg.Consensus.IsBanned(nodes["node1"].backend))
 				require.False(t, bg.Consensus.IsBanned(nodes["node2"].backend))
 			} else {
-				// require.Equal(t, uint(i+1), nodes["node1"].backend.GetBlockHeightZeroSlidingWindowCount())
 				require.False(t, nodes["node2"].backend.BlockHeightZeroAboveThreshold())
 				require.False(t, bg.Consensus.IsBanned(nodes["node1"].backend))
 				require.False(t, bg.Consensus.IsBanned(nodes["node2"].backend))
@@ -243,7 +232,6 @@ func TestBlockHeightZero(t *testing.T) {
 			require.Equal(t, uint(i/2), nodes["node1"].backend.GetBlockHeightZeroSlidingWindow().Count())
 			require.Equal(t, uint(0), nodes["node2"].backend.GetBlockHeightZeroSlidingWindow().Count())
 
-			addTimeToBackend(3 * time.Second)
 			addTimeToBackend(3 * time.Second)
 		}
 	})

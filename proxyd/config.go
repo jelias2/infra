@@ -103,6 +103,9 @@ type BackendConfig struct {
 	ConsensusSkipPeerCountCheck bool   `toml:"consensus_skip_peer_count"`
 	ConsensusForcedCandidate    bool   `toml:"consensus_forced_candidate"`
 	ConsensusReceiptsTarget     string `toml:"consensus_receipts_target"`
+
+	BlockHeightZeroWindowLength       TOMLDuration `toml:"block_height_zero_window_length"`
+	BlockHeightZeroErrorRateThreshold float64      `toml:"block_height_zero_infraction_threshold"`
 }
 
 type BackendsConfig map[string]*BackendConfig

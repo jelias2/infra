@@ -322,6 +322,21 @@ func (cp *ConsensusPoller) UpdateBackend(ctx context.Context, be *Backend) {
 		log.Warn("error updating backend - latest block", "name", be.Name, "err", err)
 	}
 
+	if latestBlockNumber == 0 {
+		be.blockHeightZeroSlidingWindow.Incr()
+		log.Warn("unexpected block height zero response for latest block",
+			"name", be.Name,
+			"infraction_count", be.blockHeightZeroSlidingWindow.Avg(),
+		)
+		if be.BlockHeightZeroAboveThreshold() {
+			log.Warn("banning backend for too many block height zero responses",
+				"name", be.Name,
+			)
+			cp.Ban(be)
+		}
+		return
+	}
+
 	safeBlockNumber, _, err := cp.fetchBlock(ctx, be, "safe")
 	if err != nil {
 		log.Warn("error updating backend - safe block", "name", be.Name, "err", err)

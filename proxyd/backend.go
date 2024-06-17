@@ -760,11 +760,6 @@ func (b *Backend) BlockHeightZeroAboveThreshold() bool {
 	return b.BlockHeightZeroErrorRate() > b.maxBlockHeightZeroThreshold
 }
 
-// BlockHeightZeroCount returns the amount of infractions in the window
-func (b *Backend) BlockHeightZeroCount() uint {
-	return b.blockHeightZeroSlidingWindow.Count()
-}
-
 type BackendGroup struct {
 	Name             string
 	Backends         []*Backend

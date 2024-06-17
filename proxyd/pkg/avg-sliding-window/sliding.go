@@ -90,15 +90,7 @@ func WithBucketSize(bucketSize time.Duration) SlidingWindowOpts {
 	}
 }
 
-// func WithClock(clock *AdjustableClock) SlidingWindowOpts {
-// func WithClock(clock *Clock) SlidingWindowOpts {
 func WithClock(clock Clock) SlidingWindowOpts {
-	return func(sw *AvgSlidingWindow) {
-		sw.clock = clock
-	}
-}
-
-func WithAdjustableClock(clock *AdjustableClock) SlidingWindowOpts {
 	return func(sw *AvgSlidingWindow) {
 		sw.clock = clock
 	}
@@ -197,15 +189,3 @@ func (sw *AvgSlidingWindow) Count() uint {
 	sw.advance()
 	return sw.qty
 }
-
-func (sw *AvgSlidingWindow) GetWindowLength() time.Duration {
-	return sw.windowLength
-}
-
-// func (sw *AvgSlidingWindow) SetTime(t time.Time) {
-// 	sw.clock.Set(t)
-// }
-//
-// func (sw *AvgSlidingWindow) Now() time.Time {
-// 	return sw.clock.now
-// }

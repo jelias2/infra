@@ -372,7 +372,7 @@ func NewBackend(
 }
 
 func (b *Backend) GetBlockHeightZeroSlidingWindowLength() time.Duration {
-	return b.blockHeightZeroSlidingWindow.GetWindowLength()
+	return b.blockHeightZeroSlidingWindowLength
 }
 
 func (b *Backend) GetBlockHeightZeroSlidingWindowCount() uint {

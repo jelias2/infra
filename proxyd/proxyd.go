@@ -173,7 +173,9 @@ func Start(config *Config) (*Server, func(), error) {
 			return nil, nil, err
 		}
 		opts = append(opts, WithConsensusReceiptTarget(receiptsTarget))
-		opts = append(opts, WithBlockHeightZeroSlidingWindowLength(time.Duration(cfg.BlockHeightZeroWindowLength)))
+		if cfg.BlockHeightZeroSlidingWindowLength != 0 {
+			opts = append(opts, WithBlockHeightZeroSlidingWindowLength(time.Duration(cfg.BlockHeightZeroSlidingWindowLength)))
+		}
 
 		if cfg.BlockHeightZeroErrorRateThreshold > 0 && cfg.BlockHeightZeroErrorRateThreshold < 1 {
 			opts = append(opts, WithBlockHeightZeroThreshold(cfg.BlockHeightZeroErrorRateThreshold))

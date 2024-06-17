@@ -8,12 +8,13 @@ max_degraded_latency_threshold = "30ms"
 [backends]
 [backends.node1]
 rpc_url = "$NODE1_URL"
-block_height_zero_window_length = "100ms"
+block_height_zero_window_length = "60s"
 block_height_zero_infraction_threshold = 0.1
 
 [backends.node2]
 rpc_url = "$NODE2_URL"
 block_height_zero_infraction_threshold = 0.5
+block_height_zero_window_length = "60s"
 
 [backend_groups]
 [backend_groups.node]

@@ -24,8 +24,7 @@ type bhZeroNodeContext struct {
 }
 
 const (
-	SlidingWindowLength     = 60 * time.Second
-	SlidingWindowBucketSize = 1 * time.Second
+	SlidingWindowLength = 60 * time.Second
 )
 
 // ts is a convenient method that must parse a time.Time from a string in format `"2006-01-02 15:04:05"`
@@ -82,19 +81,18 @@ func setupBlockHeightZero(t *testing.T) (map[string]*bhZeroNodeContext, *proxyd.
 
 	now := ts("2023-04-21 15:00:00")
 
+	// Create a New Sliding Window and maintain pointer to clock
 	clock := sw.NewAdjustableClock(now)
 	sw1 := sw.NewSlidingWindow(
-		sw.WithWindowLength(SlidingWindowLength),
-		sw.WithBucketSize(SlidingWindowBucketSize),
+		sw.WithWindowLength(time.Duration(config.Backends["node1"].BlockHeightZeroSlidingWindowLength)),
 		sw.WithClock(clock))
 
-	clock.Set(ts("2023-04-25 15:55:55"))
-	// require.Equal(t, sw1., clock.Now())
+	sw2 := sw.NewSlidingWindow(
+		sw.WithWindowLength(time.Duration(config.Backends["node2"].BlockHeightZeroSlidingWindowLength)),
+		sw.WithClock(clock))
 
 	bg.Backends[0].Override(proxyd.WithBlockHeightZeroSlidingWindow(sw1))
-	bg.Backends[1].Override(proxyd.WithBlockHeightZeroSlidingWindow(sw1))
-
-	clock.Set(ts("2023-04-25 14:44:44"))
+	bg.Backends[1].Override(proxyd.WithBlockHeightZeroSlidingWindow(sw2))
 
 	// Confirm the Backends Window Length is Set
 	require.Equal(t, bg.Backends[0].GetBlockHeightZeroSlidingWindowLength(),

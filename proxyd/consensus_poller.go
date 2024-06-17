@@ -326,11 +326,15 @@ func (cp *ConsensusPoller) UpdateBackend(ctx context.Context, be *Backend) {
 		be.blockHeightZeroSlidingWindow.Incr()
 		log.Warn("unexpected block height zero response for latest block",
 			"name", be.Name,
-			"infraction_count", be.blockHeightZeroSlidingWindow.Avg(),
+			"infraction_count", be.blockHeightZeroSlidingWindow.Count(),
+			"error_rate", be.BlockHeightZeroErrorRate(),
 		)
 		if be.BlockHeightZeroAboveThreshold() {
 			log.Warn("banning backend for too many block height zero responses",
 				"name", be.Name,
+				"infraction_count", be.blockHeightZeroSlidingWindow.Count(),
+				"error_rate", be.BlockHeightZeroErrorRate(),
+				"ban_threshold", be.maxBlockHeightZeroThreshold,
 			)
 			cp.Ban(be)
 		}

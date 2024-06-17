@@ -365,6 +365,8 @@ func NewBackend(
 		log.Warn("proxied requests' XFF header will not contain the proxyd ip address")
 	}
 
+	// First set blockHeightZeroSlidingWindowLength using default or opt, then create
+	// then initialize the sliding sliding
 	backend.blockHeightZeroSlidingWindow = sw.NewSlidingWindow(
 		sw.WithWindowLength(backend.blockHeightZeroSlidingWindowLength),
 	)

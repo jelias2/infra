@@ -37,7 +37,7 @@ func ts(s string) time.Time {
 	return t
 }
 
-func setupBlockHeightZero(t *testing.T) (map[string]*bhZeroNodeContext, *proxyd.BackendGroup, *ProxydHTTPClient, func(), proxyd.TOMLDuration) {
+func setupBlockHeightZero(t *testing.T) (map[string]*bhZeroNodeContext, *proxyd.BackendGroup, *ProxydHTTPClient, func(), *sw.AdjustableClock) {
 	// setup mock servers
 	node1 := NewMockBackend(nil)
 	node2 := NewMockBackend(nil)
@@ -66,7 +66,7 @@ func setupBlockHeightZero(t *testing.T) (map[string]*bhZeroNodeContext, *proxyd.
 
 	// setup proxyd
 	config := ReadConfig("block_height_zero")
-	banPeriod := config.BackendGroups["node"].ConsensusBanPeriod
+	// banPeriod := config.BackendGroups["node"].ConsensusBanPeriod
 	// bhZeroErrorRate := config.BackendGroups["node"].ConsensusBanPeriod
 	svr, shutdown, err := proxyd.Start(config)
 	require.NoError(t, err)
@@ -88,8 +88,13 @@ func setupBlockHeightZero(t *testing.T) (map[string]*bhZeroNodeContext, *proxyd.
 		sw.WithBucketSize(SlidingWindowBucketSize),
 		sw.WithClock(clock))
 
+	clock.Set(ts("2023-04-25 15:55:55"))
+	// require.Equal(t, sw1., clock.Now())
+
 	bg.Backends[0].Override(proxyd.WithBlockHeightZeroSlidingWindow(sw1))
 	bg.Backends[1].Override(proxyd.WithBlockHeightZeroSlidingWindow(sw1))
+
+	clock.Set(ts("2023-04-25 14:44:44"))
 
 	// Confirm the Backends Window Length is Set
 	require.Equal(t, bg.Backends[0].GetBlockHeightZeroSlidingWindowLength(),
@@ -119,11 +124,12 @@ func setupBlockHeightZero(t *testing.T) (map[string]*bhZeroNodeContext, *proxyd.
 		},
 	}
 
-	return nodes, bg, client, shutdown, banPeriod
+	return nodes, bg, client, shutdown, clock
 }
 
 func TestBlockHeightZero(t *testing.T) {
-	nodes, bg, _, shutdown, _ := setupBlockHeightZero(t)
+	nodes, bg, _, shutdown, c1 := setupBlockHeightZero(t)
+	c1.Set(ts("2023-04-25 13:33:33"))
 	defer nodes["node1"].mockBackend.Close()
 	defer nodes["node2"].mockBackend.Close()
 	defer shutdown()
@@ -147,23 +153,8 @@ func TestBlockHeightZero(t *testing.T) {
 		return t
 	}
 
-	addTimeToBackend := func(node string, nodes map[string]*bhZeroNodeContext, bg *proxyd.BackendGroup, ts time.Duration) {
-		// updatedBackends := []*proxyd.Backend{}
-		for i, b := range bg.Backends {
-			if b.Name == node {
-				// Get the mock backend and set the clock
-				// clock := mockBackend.backend.GetBlockHeightZeroSlidingWindow()
-				clock := b.GetBlockHeightZeroSlidingWindow()
-				clock.SetTime(clock.Now().Add(ts))
-				b.SetBlockHeightZeroSlidingWindow(clock)
-				bg.Backends[i] = b
-
-				// Update the mock backend mapping
-				// nodes[node] = mockBackend
-				// updatedBackends = append(updatedBackends, mockBackend.backend)
-			}
-		}
-		// copy(bg.Backends, updatedBackends)
+	addTimeToBackend := func(ts time.Duration) {
+		c1.Set(c1.Now().Add(ts))
 	}
 	// convenient methods to manipulate state and mock responses
 	reset := func() {
@@ -180,20 +171,21 @@ func TestBlockHeightZero(t *testing.T) {
 		require.False(t, bg.Consensus.IsBanned(nodes["node2"].backend))
 
 		now := ts("2023-04-21 15:04:00")
-		clock := sw.NewAdjustableClock(now)
+		// Clear the sliding windows
+		c1.Set(now)
 		b1.bhZeroWindow = sw.NewSlidingWindow(
 			sw.WithWindowLength(60*time.Second),
 			sw.WithBucketSize(time.Second),
-			sw.WithClock(clock))
+			sw.WithClock(c1))
 
 		b2.bhZeroWindow = sw.NewSlidingWindow(
 			sw.WithWindowLength(60*time.Second),
 			sw.WithBucketSize(time.Second),
-			sw.WithClock(clock))
+			sw.WithClock(c1))
 
-		// addTimeToBackend("node1", nodes, bg, 23*time.Second)
 		bg.Backends[0].SetBlockHeightZeroSlidingWindow(b1.bhZeroWindow)
 		bg.Backends[1].SetBlockHeightZeroSlidingWindow(b2.bhZeroWindow)
+		c1.Set(ts("2023-04-25 12:22:22"))
 	}
 
 	override := func(node string, method string, block string, response string) {
@@ -226,7 +218,7 @@ func TestBlockHeightZero(t *testing.T) {
 			require.Equal(t, float64(1), nodes["node1"].backend.GetBlockHeightZeroSlidingWindowAvg())
 			require.False(t, bg.Consensus.IsBanned(nodes["node1"].backend))
 			require.False(t, bg.Consensus.IsBanned(nodes["node2"].backend))
-			addTimeToBackend("node1", nodes, bg, SlidingWindowLength+time.Second)
+			addTimeToBackend(SlidingWindowLength + time.Second)
 		}
 		require.False(t, bg.Consensus.IsBanned(nodes["node1"].backend))
 		require.False(t, bg.Consensus.IsBanned(nodes["node2"].backend))
@@ -246,7 +238,7 @@ func TestBlockHeightZero(t *testing.T) {
 				require.False(t, bg.Consensus.IsBanned(nodes["node1"].backend))
 				require.False(t, bg.Consensus.IsBanned(nodes["node2"].backend))
 			}
-			addTimeToBackend("node1", nodes, bg, 3*time.Second)
+			addTimeToBackend(3 * time.Second)
 		}
 		require.True(t, bg.Consensus.IsBanned(nodes["node1"].backend))
 		require.False(t, bg.Consensus.IsBanned(nodes["node2"].backend))
@@ -264,8 +256,8 @@ func TestBlockHeightZero(t *testing.T) {
 			require.Equal(t, uint(i/2), nodes["node1"].backend.GetBlockHeightZeroSlidingWindow().Count())
 			require.Equal(t, uint(0), nodes["node2"].backend.GetBlockHeightZeroSlidingWindow().Count())
 
-			addTimeToBackend("node1", nodes, bg, 3*time.Second)
-			addTimeToBackend("node2", nodes, bg, 3*time.Second)
+			addTimeToBackend(3 * time.Second)
+			addTimeToBackend(3 * time.Second)
 		}
 	})
 
@@ -279,7 +271,7 @@ func TestBlockHeightZero(t *testing.T) {
 				require.True(t, bg.Consensus.IsBanned(nodes["node1"].backend))
 				break
 			}
-			addTimeToBackend("node1", nodes, bg, 1*time.Second)
+			addTimeToBackend(1 * time.Second)
 		}
 
 		// Unban, and start seeing good blocks = no ban
@@ -288,7 +280,7 @@ func TestBlockHeightZero(t *testing.T) {
 		for i := 0; i < 5; i++ {
 			update()
 			require.False(t, bg.Consensus.IsBanned(nodes["node1"].backend))
-			addTimeToBackend("node1", nodes, bg, 1*time.Second)
+			addTimeToBackend(1 * time.Second)
 		}
 
 		// See a bad block, and sliding window above threshold -> ban
@@ -308,9 +300,9 @@ func TestBlockHeightZero(t *testing.T) {
 				require.True(t, bg.Consensus.IsBanned(nodes["node1"].backend))
 				require.False(t, bg.Consensus.IsBanned(nodes["node2"].backend))
 			}
-			addTimeToBackend("node1", nodes, bg, 1*time.Second)
+			addTimeToBackend(1 * time.Second)
 		}
-		addTimeToBackend("node1", nodes, bg, 50*time.Second)
+		addTimeToBackend(50 * time.Second)
 		bg.Consensus.Unban(nodes["node1"].backend)
 
 		update()

@@ -14,13 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type bhZeroNodeContext struct {
-	// NOTE: maybe reuse the node context from consensus test here
-	backend     *proxyd.Backend   // this is the actual backend impl in proxyd
-	mockBackend *MockBackend      // this is the fake backend that we can use to mock responses
-	handler     *ms.MockedHandler // this is where we control the state of mocked responses
-}
-
 // ts is a convenient method that must parse a time.Time from a string in format `"2006-01-02 15:04:05"`
 func ts(s string) time.Time {
 	t, err := time.Parse(time.DateTime, s)
@@ -30,7 +23,7 @@ func ts(s string) time.Time {
 	return t
 }
 
-func setupBlockHeightZero(t *testing.T) (map[string]*bhZeroNodeContext, *proxyd.BackendGroup, *ProxydHTTPClient, func(), *sw.AdjustableClock) {
+func setupBlockHeightZero(t *testing.T) (map[string]*nodeContext, *proxyd.BackendGroup, *ProxydHTTPClient, func(), *sw.AdjustableClock) {
 	// setup mock servers
 	node1 := NewMockBackend(nil)
 	node2 := NewMockBackend(nil)
@@ -93,7 +86,7 @@ func setupBlockHeightZero(t *testing.T) (map[string]*bhZeroNodeContext, *proxyd.
 	bg.Backends[1].Override(proxyd.WithBlockHeightZeroSlidingWindow(sw2))
 
 	// convenient mapping to access the nodes
-	nodes := map[string]*bhZeroNodeContext{
+	nodes := map[string]*nodeContext{
 		"node1": {
 			mockBackend: node1,
 			backend:     bg.Backends[0],
@@ -110,7 +103,7 @@ func setupBlockHeightZero(t *testing.T) (map[string]*bhZeroNodeContext, *proxyd.
 }
 
 func TestBlockHeightZero(t *testing.T) {
-	nodes, bg, _, shutdown, c1 := setupBlockHeightZero(t)
+	nodes, bg, _, shutdown, clock := setupBlockHeightZero(t)
 	defer nodes["node1"].mockBackend.Close()
 	defer nodes["node2"].mockBackend.Close()
 	defer shutdown()
@@ -135,7 +128,7 @@ func TestBlockHeightZero(t *testing.T) {
 	}
 
 	addTimeToBackend := func(ts time.Duration) {
-		c1.Set(c1.Now().Add(ts))
+		clock.Set(clock.Now().Add(ts))
 	}
 	// convenient methods to manipulate state and mock responses
 	reset := func() {
@@ -150,16 +143,16 @@ func TestBlockHeightZero(t *testing.T) {
 		require.False(t, bg.Consensus.IsBanned(nodes["node2"].backend))
 
 		// Reset and clear the sliding windows
-		c1.Set(ts("2023-04-21 15:04:00"))
+		clock.Set(ts("2023-04-21 15:04:00"))
 		sw1 := sw.NewSlidingWindow(
 			sw.WithWindowLength(60*time.Second),
 			sw.WithBucketSize(time.Second),
-			sw.WithClock(c1))
+			sw.WithClock(clock))
 
 		sw2 := sw.NewSlidingWindow(
 			sw.WithWindowLength(60*time.Second),
 			sw.WithBucketSize(time.Second),
-			sw.WithClock(c1))
+			sw.WithClock(clock))
 
 		bg.Backends[0].SetBlockHeightZeroSlidingWindow(sw1)
 		bg.Backends[1].SetBlockHeightZeroSlidingWindow(sw2)

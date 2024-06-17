@@ -20,8 +20,10 @@ backends = ["node1", "node2"]
 consensus_aware = true
 consensus_handler = "noop"    # allow more control over the consensus poller for tests
 
-## Need to set very large, becaue consensus poller uses system clock, not adjustable clock
+## Consensus Ban Need to set very large, becaue consensus poller uses system clock, not adjustable clock
+## if a certain test case takes longer than 15m it may break
 consensus_ban_period = "15m"
+
 consensus_max_update_threshold = "2m"
 consensus_max_block_lag = 8
 consensus_min_peer_count = 4

@@ -23,10 +23,6 @@ type bhZeroNodeContext struct {
 	clock        *sw.AdjustableClock // this is where we control backend time
 }
 
-const (
-	SlidingWindowLength = 60 * time.Second
-)
-
 // ts is a convenient method that must parse a time.Time from a string in format `"2006-01-02 15:04:05"`
 func ts(s string) time.Time {
 	t, err := time.Parse(time.DateTime, s)
@@ -65,8 +61,6 @@ func setupBlockHeightZero(t *testing.T) (map[string]*bhZeroNodeContext, *proxyd.
 
 	// setup proxyd
 	config := ReadConfig("block_height_zero")
-	// banPeriod := config.BackendGroups["node"].ConsensusBanPeriod
-	// bhZeroErrorRate := config.BackendGroups["node"].ConsensusBanPeriod
 	svr, shutdown, err := proxyd.Start(config)
 	require.NoError(t, err)
 
@@ -77,33 +71,28 @@ func setupBlockHeightZero(t *testing.T) (map[string]*bhZeroNodeContext, *proxyd.
 	bg := svr.BackendGroups["node"]
 	require.NotNil(t, bg)
 	require.NotNil(t, bg.Consensus)
-	require.Equal(t, 2, len(bg.Backends)) // should match config
+	require.Equal(t, 2, len(bg.Backends))
 
-	now := ts("2023-04-21 15:00:00")
+	// Check backend default values are non zero
+	require.Equal(t, 60*time.Second, bg.Backends[0].GetBlockHeightZeroSlidingWindowLength())
+	require.Equal(t, float64(0.1), bg.Backends[0].GetBlockHeightZeroThreshold())
+
+	// Check custom values can be applied
+	require.Equal(t, 70*time.Second, bg.Backends[1].GetBlockHeightZeroSlidingWindowLength())
+	require.Equal(t, float64(0.5), bg.Backends[1].GetBlockHeightZeroThreshold())
 
 	// Create a New Sliding Window and maintain pointer to clock
-	clock := sw.NewAdjustableClock(now)
+	clock := sw.NewAdjustableClock(ts("2023-04-21 15:00:00"))
 	sw1 := sw.NewSlidingWindow(
-		sw.WithWindowLength(time.Duration(config.Backends["node1"].BlockHeightZeroSlidingWindowLength)),
+		sw.WithWindowLength(bg.Backends[0].GetBlockHeightZeroSlidingWindowLength()),
 		sw.WithClock(clock))
 
 	sw2 := sw.NewSlidingWindow(
-		sw.WithWindowLength(time.Duration(config.Backends["node2"].BlockHeightZeroSlidingWindowLength)),
+		sw.WithWindowLength(bg.Backends[1].GetBlockHeightZeroSlidingWindowLength()),
 		sw.WithClock(clock))
 
 	bg.Backends[0].Override(proxyd.WithBlockHeightZeroSlidingWindow(sw1))
 	bg.Backends[1].Override(proxyd.WithBlockHeightZeroSlidingWindow(sw2))
-
-	// Confirm the Backends Window Length is Set
-	require.Equal(t, bg.Backends[0].GetBlockHeightZeroSlidingWindowLength(),
-		SlidingWindowLength)
-
-	require.Equal(t, bg.Backends[1].GetBlockHeightZeroSlidingWindowLength(),
-		SlidingWindowLength)
-
-	// Check that Thresholds from config are applied
-	require.Equal(t, 0.1, bg.Backends[0].GetBlockHeightZeroThreshold())
-	require.Equal(t, 0.5, bg.Backends[1].GetBlockHeightZeroThreshold())
 
 	// convenient mapping to access the nodes, and sliding windows by name
 	nodes := map[string]*bhZeroNodeContext{
@@ -216,7 +205,7 @@ func TestBlockHeightZero(t *testing.T) {
 			require.Equal(t, float64(1), nodes["node1"].backend.GetBlockHeightZeroSlidingWindowAvg())
 			require.False(t, bg.Consensus.IsBanned(nodes["node1"].backend))
 			require.False(t, bg.Consensus.IsBanned(nodes["node2"].backend))
-			addTimeToBackend(SlidingWindowLength + time.Second)
+			addTimeToBackend(nodes["node1"].backend.GetBlockHeightZeroSlidingWindowLength() + time.Second)
 		}
 		require.False(t, bg.Consensus.IsBanned(nodes["node1"].backend))
 		require.False(t, bg.Consensus.IsBanned(nodes["node2"].backend))

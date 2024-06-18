@@ -2,6 +2,7 @@ package integration_tests
 
 import (
 	"context"
+	"math"
 	"net/http"
 	"os"
 	"path"
@@ -64,13 +65,12 @@ func setupBlockHeightZero(t *testing.T) (map[string]*nodeContext, *proxyd.Backen
 	require.NotNil(t, bg.Consensus)
 	require.Equal(t, 2, len(bg.Backends))
 
-	// Check backend default values are non zero
+	// Check backend values
 	require.Equal(t, 60*time.Second, bg.Backends[0].GetBlockHeightZeroSlidingWindow().WindowLength())
 	require.Equal(t, float64(0.1), bg.Backends[0].GetBlockHeightZeroThreshold())
 
-	// Check custom values can be applied
 	require.Equal(t, 70*time.Second, bg.Backends[1].GetBlockHeightZeroSlidingWindow().WindowLength())
-	require.Equal(t, float64(0.5), bg.Backends[1].GetBlockHeightZeroThreshold())
+	require.Equal(t, math.MaxFloat64, bg.Backends[1].GetBlockHeightZeroThreshold())
 
 	// Create a New Sliding Window and maintain pointer to clock
 	clock := sw.NewAdjustableClock(ts("2023-04-21 15:00:00"))

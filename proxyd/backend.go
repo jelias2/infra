@@ -353,10 +353,9 @@ func NewBackend(
 		networkRequestsSlidingWindow: sw.NewSlidingWindow(),
 		networkErrorsSlidingWindow:   sw.NewSlidingWindow(),
 
-		// NOTE: default use the block height sliding window 1 min,
-		// we can override later in backend opts
+		// NOTE: Set Threshold to high value for default off
 		blockHeightZeroSlidingWindowLength: 1 * time.Minute,
-		maxBlockHeightZeroThreshold:        0.1,
+		maxBlockHeightZeroThreshold:        math.MaxFloat64,
 	}
 
 	backend.Override(opts...)

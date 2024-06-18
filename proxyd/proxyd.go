@@ -177,7 +177,7 @@ func Start(config *Config) (*Server, func(), error) {
 			opts = append(opts, WithBlockHeightZeroSlidingWindowLength(time.Duration(cfg.BlockHeightZeroSlidingWindowLength)))
 		}
 
-		if cfg.BlockHeightZeroErrorRateThreshold > 0 && cfg.BlockHeightZeroErrorRateThreshold < 1 {
+		if cfg.BlockHeightZeroErrorRateThreshold != 0 {
 			opts = append(opts, WithBlockHeightZeroThreshold(cfg.BlockHeightZeroErrorRateThreshold))
 		}
 

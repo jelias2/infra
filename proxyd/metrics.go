@@ -428,6 +428,16 @@ var (
 		"backend_name",
 		"fallback",
 	})
+
+	blockHeightZeroErrorRate = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: MetricsNamespace,
+		Name:      "block_height_zero_error_count",
+		Help:      "Record the amount of errors for fetching block height",
+	}, []string{
+		"backend_name",
+		// TODO: Add error code.. maybe
+		// "error_code",
+	})
 )
 
 func RecordRedisError(source string) {
@@ -591,6 +601,10 @@ func RecordBackendNetworkErrorRateSlidingWindow(b *Backend, rate float64) {
 
 func RecordBackendGroupFallbacks(bg *BackendGroup, name string, fallback bool) {
 	backendGroupFallbackBackend.WithLabelValues(bg.Name, name, strconv.FormatBool(fallback)).Set(boolToFloat64(fallback))
+}
+
+func RecordBlockHeightZeroError(b *Backend) {
+	blockHeightZeroErrorRate.WithLabelValues(b.Name)
 }
 
 func boolToFloat64(b bool) float64 {

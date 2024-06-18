@@ -323,6 +323,8 @@ func (cp *ConsensusPoller) UpdateBackend(ctx context.Context, be *Backend) {
 	}
 
 	if latestBlockNumber == 0 {
+		// TODO: Extract Error Code from error if it exists
+		RecordBlockHeightZeroError(be)
 		be.blockHeightZeroSlidingWindow.Incr()
 		log.Warn("unexpected block height zero response for latest block",
 			"name", be.Name,

@@ -593,6 +593,11 @@ func RecordBackendGroupFallbacks(bg *BackendGroup, name string, fallback bool) {
 	backendGroupFallbackBackend.WithLabelValues(bg.Name, name, strconv.FormatBool(fallback)).Set(boolToFloat64(fallback))
 }
 
+// TODO: See how to best catagorize fanout metrics
+// func Re(bg *BackendGroup, name string, fallback bool) {
+// 	backendGroupFallbackBackend.WithLabelValues(bg.Name, name, strconv.FormatBool(fallback)).Set(boolToFloat64(fallback))
+// }
+
 func boolToFloat64(b bool) float64 {
 	if b {
 		return 1

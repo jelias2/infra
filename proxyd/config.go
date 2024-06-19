@@ -128,6 +128,7 @@ type BackendGroupConfig struct {
 	ConsensusHARedis             RedisConfig  `toml:"consensus_ha_redis"`
 
 	Fallbacks []string `toml:"fallbacks"`
+	Fanouts   []string `toml:"fanouts"`
 }
 
 type BackendGroupsConfig map[string]*BackendGroupConfig

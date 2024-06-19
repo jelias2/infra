@@ -710,6 +710,7 @@ type BackendGroup struct {
 	WeightedRouting  bool
 	Consensus        *ConsensusPoller
 	FallbackBackends map[string]bool
+	FanoutBackends   map[string]bool
 }
 
 func (bg *BackendGroup) Fallbacks() []*Backend {
@@ -720,6 +721,16 @@ func (bg *BackendGroup) Fallbacks() []*Backend {
 		}
 	}
 	return fallbacks
+}
+
+func (bg *BackendGroup) Fanouts() []*Backend {
+	fanouts := []*Backend{}
+	for _, a := range bg.Backends {
+		if fanout, ok := bg.FanoutBackends[a.Name]; ok && fanout {
+			fanouts = append(fanouts, a)
+		}
+	}
+	return fanouts
 }
 
 func (bg *BackendGroup) Primaries() []*Backend {
@@ -744,8 +755,10 @@ func (bg *BackendGroup) Forward(ctx context.Context, rpcReqs []*RPCReq, isBatch 
 	overriddenResponses := make([]*indexedReqRes, 0)
 	rewrittenReqs := make([]*RPCReq, 0, len(rpcReqs))
 
+	var err error
+
 	if bg.Consensus != nil {
-		// When `consensus_aware` is set to `true`, the backend group acts as a load balancer
+		// bg.OverwriteConsensus(rpcReqs, overriddenResponses, rewrittenReqs)		// When `consensus_aware` is set to `true`, the backend group acts as a load balancer
 		// serving traffic from any backend that agrees in the consensus group
 
 		// We also rewrite block tags to enforce compliance with consensus
@@ -790,67 +803,56 @@ func (bg *BackendGroup) Forward(ctx context.Context, rpcReqs []*RPCReq, isBatch 
 
 	rpcRequestsTotal.Inc()
 
-	for _, back := range backends {
-		res := make([]*RPCRes, 0)
-		var err error
+	// // Extract Write Requests and forward to fanout backends
+	// writeRpcs := []*RPCReq{}
+	// writeRes := []*RPCRes{}
+	// if len(bg.FanoutBackends) > 0 {
+	// 	for i, r := range rpcReqs {
+	// 		if r.Method == "eth_sendRawTransaction" {
+	// 			log.Trace("detected write request with fanouts enabled",
+	// 				"req_id", r.ID,
+	// 			)
+	// 			// Append to a write group
+	// 			writeRpcs = append(writeRpcs, r)
+	// 			// Delete from other rpcs
+	// 			rpcReqs = removeRpcsRequest(rpcReqs, i)
+	// 		}
+	// 	}
+	// 	// TODO: Check if this is proper way for batch requests, also just override servedByForFannout for now
+	// 	writeRes, _, err = bg.SendRequestToBackendGroup(writeRpcs, ctx, bg.Fanouts(), len(writeRpcs) > 0)
+	// 	if err != nil {
+	// 		log.Error("error serving write request with fanouts enabled",
+	// 			"req_id", GetReqID(ctx),
+	// 			"auth", GetAuthCtx(ctx),
+	// 			"err", err,
+	// 		)
+	// 	}
+	// }
 
-		servedBy := fmt.Sprintf("%s/%s", bg.Name, back.Name)
-
-		if len(rpcReqs) > 0 {
-			res, err = back.Forward(ctx, rpcReqs, isBatch)
-			if errors.Is(err, ErrConsensusGetReceiptsCantBeBatched) ||
-				errors.Is(err, ErrConsensusGetReceiptsInvalidTarget) ||
-				errors.Is(err, ErrMethodNotWhitelisted) {
-				return nil, "", err
-			}
-			if errors.Is(err, ErrBackendResponseTooLarge) {
-				return nil, servedBy, err
-			}
-			if errors.Is(err, ErrBackendOffline) {
-				log.Warn(
-					"skipping offline backend",
-					"name", back.Name,
-					"auth", GetAuthCtx(ctx),
-					"req_id", GetReqID(ctx),
-				)
-				continue
-			}
-			if errors.Is(err, ErrBackendOverCapacity) {
-				log.Warn(
-					"skipping over-capacity backend",
-					"name", back.Name,
-					"auth", GetAuthCtx(ctx),
-					"req_id", GetReqID(ctx),
-				)
-				continue
-			}
-			if err != nil {
-				log.Error(
-					"error forwarding request to backend",
-					"name", back.Name,
-					"req_id", GetReqID(ctx),
-					"auth", GetAuthCtx(ctx),
-					"err", err,
-				)
-				continue
-			}
-		}
-
-		// re-apply overridden responses
-		for _, ov := range overriddenResponses {
-			if len(res) > 0 {
-				// insert ov.res at position ov.index
-				res = append(res[:ov.index], append([]*RPCRes{ov.res}, res[ov.index:]...)...)
-			} else {
-				res = append(res, ov.res)
-			}
-		}
-
-		return res, servedBy, nil
+	res, servedBy, err := bg.SendRequestToBackendGroup(rpcReqs, ctx, backends, len(rpcReqs) > 0)
+	if err != nil {
+		log.Error(
+			"error forwarding request to backend",
+			"req_id", GetReqID(ctx),
+			"auth", GetAuthCtx(ctx),
+			"err", err,
+		)
 	}
 
-	RecordUnserviceableRequest(ctx, RPCRequestSourceHTTP)
-	return nil, "", ErrNoBackends
+	// res = append(res, writeRes...)
+
+	// re-apply overridden responses
+	for _, ov := range overriddenResponses {
+		if len(res) > 0 {
+			// insert ov.res at position ov.index
+			res = append(res[:ov.index], append([]*RPCRes{ov.res}, res[ov.index:]...)...)
+		} else {
+			res = append(res, ov.res)
+		}
+	}
+
+	return res, servedBy, nil
+
 }
 
 func (bg *BackendGroup) ProxyWS(ctx context.Context, clientConn *websocket.Conn, methodWhitelist *StringSet) (*WSProxier, error) {
@@ -1270,3 +1272,115 @@ func stripXFF(xff string) string {
 	ipList := strings.Split(xff, ",")
 	return strings.TrimSpace(ipList[0])
 }
+
+func removeRpcsRequest(rpcs []*RPCReq, s int) []*RPCReq {
+	return append(rpcs[:s], rpcs[s+1:]...)
+}
+
+func (bg *BackendGroup) SendRequestToBackendGroup(rpcReqs []*RPCReq, ctx context.Context, backends []*Backend, isBatch bool) ([]*RPCRes, string, error) {
+	for _, back := range backends {
+		res := make([]*RPCRes, 0)
+		// servedByArray := make([]string, 0)
+		// var errArray []error
+
+		servedBy := fmt.Sprintf("%s/%s", bg.Name, back.Name)
+
+		if len(rpcReqs) > 0 {
+			res, err := back.Forward(ctx, rpcReqs, isBatch)
+			if errors.Is(err, ErrConsensusGetReceiptsCantBeBatched) ||
+				errors.Is(err, ErrConsensusGetReceiptsInvalidTarget) ||
+				errors.Is(err, ErrMethodNotWhitelisted) {
+				return nil, "", err
+				// resArray = append(res, nil)
+				// servedByArray = append(servedByArray, "")
+				// errArray = append(errArray, err)
+
+			}
+			if errors.Is(err, ErrBackendResponseTooLarge) {
+				return nil, servedBy, err
+				// resArray = append(res, nil)
+				// servedByArray = append(servedByArray, "")
+				// errArray = append(errArray, err)
+			}
+			if errors.Is(err, ErrBackendOffline) {
+				log.Warn(
+					"skipping offline backend",
+					"name", back.Name,
+					"auth", GetAuthCtx(ctx),
+					"req_id", GetReqID(ctx),
+				)
+				continue
+			}
+			if errors.Is(err, ErrBackendOverCapacity) {
+				log.Warn(
+					"skipping over-capacity backend",
+					"name", back.Name,
+					"auth", GetAuthCtx(ctx),
+					"req_id", GetReqID(ctx),
+				)
+				continue
+			}
+			if err != nil {
+				log.Error(
+					"error forwarding request to backend",
+					"name", back.Name,
+					"req_id", GetReqID(ctx),
+					"auth", GetAuthCtx(ctx),
+					"err", err,
+				)
+				continue
+			}
+			return res, servedBy, nil
+		}
+
+		return res, servedBy, nil
+	}
+	RecordUnserviceableRequest(ctx, RPCRequestSourceHTTP)
+	return nil, "", ErrNoBackends
+}
+
+// overriddenResponses := make([]*indexedReqRes, 0)
+// rewrittenReqs := make([]*RPCReq, 0, len(rpcReqs))
+// func (bg *BackendGroup) OverwriteConsensus(rpcReqs []*RPCReq, overriddenResponses []*indexedReqRes, rewrittenReqs []*RPCReq) {
+// 	// When `consensus_aware` is set to `true`, the backend group acts as a load balancer
+// 	// serving traffic from any backend that agrees in the consensus group
+//
+// 	// We also rewrite block tags to enforce compliance with consensus
+// 	rctx := RewriteContext{
+// 		latest:        bg.Consensus.GetLatestBlockNumber(),
+// 		safe:          bg.Consensus.GetSafeBlockNumber(),
+// 		finalized:     bg.Consensus.GetFinalizedBlockNumber(),
+// 		maxBlockRange: bg.Consensus.maxBlockRange,
+// 	}
+//
+// 	for i, req := range rpcReqs {
+// 		res := RPCRes{JSONRPC: JSONRPCVersion, ID: req.ID}
+// 		result, err := RewriteTags(rctx, req, &res)
+// 		switch result {
+// 		case RewriteOverrideError:
+// 			overriddenResponses = append(overriddenResponses, &indexedReqRes{
+// 				index: i,
+// 				req:   req,
+// 				res:   &res,
+// 			})
+// 			if errors.Is(err, ErrRewriteBlockOutOfRange) {
+// 				res.Error = ErrBlockOutOfRange
+// 			} else if errors.Is(err, ErrRewriteRangeTooLarge) {
+// 				res.Error = ErrInvalidParams(
+// 					fmt.Sprintf("block range greater than %d max", rctx.maxBlockRange),
+// 				)
+// 			} else {
+// 				res.Error = ErrParseErr
+// 			}
+// 		case RewriteOverrideResponse:
+// 			overriddenResponses = append(overriddenResponses, &indexedReqRes{
+// 				index: i,
+// 				req:   req,
+// 				res:   &res,
+// 			})
+// 		case RewriteOverrideRequest, RewriteNone:
+// 			rewrittenReqs = append(rewrittenReqs, req)
+// 		}
+// 	}
+// 	rpcReqs = rewrittenReqs
+// }

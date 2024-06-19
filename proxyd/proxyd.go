@@ -189,6 +189,8 @@ func Start(config *Config) (*Server, func(), error) {
 		backends := make([]*Backend, 0)
 		fallbackBackends := make(map[string]bool)
 		fallbackCount := 0
+		fanoutBackends := make(map[string]bool)
+		fanoutCount := 0
 		for _, bName := range bg.Backends {
 			if backendsByName[bName] == nil {
 				return nil, nil, fmt.Errorf("backend %s is not defined", bName)
@@ -213,6 +215,17 @@ func Start(config *Config) (*Server, func(), error) {
 					"backend_group", bgName,
 				)
 			}
+
+			for _, fanout := range bg.Fanouts {
+				if bName == fanout {
+					fanoutBackends[bName] = true
+					log.Info("configured backend as fanout",
+						"backend_name", bName,
+						"backend_group", bgName,
+					)
+					fanoutCount++
+				}
+			}
 		}
 
 		if fallbackCount != len(bg.Fallbacks) {
@@ -220,6 +233,14 @@ func Start(config *Config) (*Server, func(), error) {
 				fmt.Errorf(
 					"error: number of fallbacks instantiated (%d) did not match configured (%d) for backend group %s",
 					fallbackCount, len(bg.Fallbacks), bgName,
+				)
+		}
+
+		if fanoutCount != len(bg.Fanouts) {
+			return nil, nil,
+				fmt.Errorf(
+					"error: number of Fanouts instantiated (%d) did not match configured (%d) for backend group %s",
+					fanoutCount, len(bg.Fanouts), bgName,
 				)
 		}
 
@@ -386,6 +407,15 @@ func Start(config *Config) (*Server, func(), error) {
 				} else {
 					log.Debug("configuring new backend for group", "backend_group", bgName, "backend_name", be, "fallback", fallback)
 					RecordBackendGroupFallbacks(bg, be, fallback)
+				}
+			}
+
+			for _, be := range bgcfg.Backends {
+				if fanout, ok := bg.FanoutBackends[be]; !ok {
+					log.Crit("error backend not found in backend fanout configurations", "backend_name", be)
+				} else {
+					log.Debug("configuring new backend for group", "backend_group", bgName, "backend_name", be, "fanout", fanout)
+					// RecordBackendGroupFallbacks(bg, be, fanout)
 				}
 			}
 

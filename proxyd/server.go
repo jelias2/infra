@@ -573,7 +573,7 @@ func (s *Server) handleBatchRPC(ctx context.Context, reqs []json.RawMessage, isL
 	}
 
 	servedByString := ""
-	for sb := range servedBy {
+	for sb, _ := range servedBy {
 		if servedByString != "" {
 			servedByString += ", "
 		}

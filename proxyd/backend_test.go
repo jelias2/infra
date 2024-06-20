@@ -1,9 +1,8 @@
 package proxyd
 
 import (
-	"testing"
-
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func TestStripXFF(t *testing.T) {

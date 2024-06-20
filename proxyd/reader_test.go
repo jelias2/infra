@@ -1,11 +1,10 @@
 package proxyd
 
 import (
+	"github.com/stretchr/testify/require"
 	"io"
 	"strings"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 )
 
 func TestLimitReader(t *testing.T) {

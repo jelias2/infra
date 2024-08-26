@@ -18,11 +18,11 @@ op-host-manager:
 
 .PHONY: docker
 docker: op-host-manager
-	cd .. &&  docker buildx build -f ./op-host-manager/Dockerfile -t $(REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG) . --platform linux/arm64
+	cd .. &&  docker buildx build -f ./op-host-manager/Dockerfile -t $(REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG) . --platform linux/amd64
 	docker push $(REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG)
 
 .PHONY: deploy-local
-deploy-local:
+deploy-local: docker
 	@TEMP_FILE=$$(mktemp); \
 	sed "s|your-registry/node-labeler:v1|$(REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG)|g" ./k8s/k8.yaml > ./k8s/k8s.tmp; \
 	kubectl apply -f ./k8s/k8s.tmp; \

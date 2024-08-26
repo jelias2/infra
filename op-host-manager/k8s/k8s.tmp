@@ -20,13 +20,14 @@ spec:
       serviceAccountName: op-host-manager-sa
       containers:
       - name: op-host-manager
-        image: jellydones/op-host-manager:fa1b807
+        image: jellydones/op-host-manager:cb65860
         resources:
           limits:
-            memory: 200Mi
+            cpu: 200m
+            memory: 400Mi
           requests:
-            cpu: 100m
-            memory: 200Mi
+            cpu: 200m
+            memory: 400Mi
 ---
 apiVersion: v1
 kind: ServiceAccount

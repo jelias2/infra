@@ -1,10 +1,10 @@
 package server
 
 import (
-	"fmt"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/gorilla/mux"
 	"net/http"
+	"time"
 )
 
 type Server struct {
@@ -27,11 +27,17 @@ func NewServer() Server {
 }
 
 func (s *Server) Start() {
-	go func() {
-		if err := (http.ListenAndServe(fmt.Sprintf(":%d", s.port), nil)); err != nil {
-			log.Crit("Error running server, exiting", err)
-		}
-	}()
+	srv := &http.Server{
+		Handler: s.router,
+		Addr:    "127.0.0.1:8000",
+		// Good practice: enforce timeouts for servers you create!
+		WriteTimeout: 5 * time.Second,
+		ReadTimeout:  5 * time.Second,
+	}
+
+	if err := srv.ListenAndServe(); err != nil {
+		log.Crit("Error with server")
+	}
 }
 
 func HandleHealthz(w http.ResponseWriter, r *http.Request) {

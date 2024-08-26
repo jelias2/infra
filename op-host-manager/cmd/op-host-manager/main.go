@@ -39,12 +39,20 @@ func main() {
 		}
 	}
 
+	log.Info("Config aquired. ",
+		"Current username", config.Username,
+	)
+
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		panic(err.Error())
+		log.Crit("Error initalizing clientset",
+			"error", err.Error(),
+		)
 	}
+	log.Info("Starting to update labels")
 	go updateLabels(clientset)
 
+	log.Info("Starting server")
 	srv := server.NewServer()
 	srv.Start()
 }
@@ -52,15 +60,20 @@ func main() {
 func updateLabels(clientset *kubernetes.Clientset) {
 	// Main loop
 	i := 0
+	log.Info("Beginning update labels")
 	for {
+		log.Info("Listing nodes")
 		nodes, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			log.Error("Error listing nodes: %v\n", err)
-			time.Sleep(5 * time.Minute)
+			time.Sleep(10 * time.Second)
 			continue
 		}
 
 		for _, node := range nodes.Items {
+			log.Info("updating node",
+				"node-name", node.Name,
+			)
 			// Example: Add a custom label to each node
 			newLabels := node.Labels
 			newLabels["custom-label"] = fmt.Sprintf("example-value-%d", i)
@@ -73,7 +86,6 @@ func updateLabels(clientset *kubernetes.Clientset) {
 				log.Error("Updated labels for node %s\n", node.Name)
 			}
 		}
-
 		// Wait before next iteration
 		time.Sleep(5 * time.Second)
 		log.Info("Sleeping")

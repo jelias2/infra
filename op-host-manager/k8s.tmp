@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-labeler
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      name: node-labeler
+  template:
+    metadata:
+      labels:
+        name: node-labeler
+    spec:
+      serviceAccountName: node-labeler-sa
+      containers:
+      - name: node-labeler
+        image: op-host-manager:fa1b807
+        resources:
+          limits:
+            memory: 200Mi
+          requests:
+            cpu: 100m
+            memory: 200Mi
+---
+kind: ServiceAccount
+metadata:
+  name: node-labeler-sa
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: node-labeler-role
+rules:
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: node-labeler-role-binding
+subjects:
+- kind: ServiceAccount
+  name: node-labeler-sa
+  namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: node-labeler-role
+  apiGroup: rbac.authorization.k8s.io

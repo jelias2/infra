@@ -27,10 +27,9 @@ func NewServer() Server {
 }
 
 func (s *Server) Start() {
-	log.Fat()
 	go func() {
 		if err := (http.ListenAndServe(fmt.Sprintf(":%d", s.port), nil)); err != nil {
-			log.Error("error starting metrics server", "err", err)
+			log.Crit("Error running server, exiting", err)
 		}
 	}()
 }

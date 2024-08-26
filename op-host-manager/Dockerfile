@@ -28,5 +28,4 @@ VOLUME /etc/op-host-manager
 
 COPY --from=builder /app/bin/op-host-manager /bin/op-host-manager
 
-ENTRYPOINT ["/bin/entrypoint.sh"]
-CMD ["/bin/op-host-manager", "/etc/op-host-manager/proxyd.toml"]
+CMD ["/bin/op-host-manager"]

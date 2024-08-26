@@ -4,3 +4,5 @@
 coverage.out
 
 bin/
+
+op-conductor-ops/__pycache__/

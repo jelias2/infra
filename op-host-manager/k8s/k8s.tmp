@@ -18,9 +18,11 @@ spec:
         name: op-host-manager
     spec:
       serviceAccountName: op-host-manager-sa
+      nodeSelector:
+        op-host-manager: "true"
       containers:
       - name: op-host-manager
-        image: jellydones/op-host-manager:6a3b8cc
+        image: jellydones/op-host-manager:68d598c
         env:
         - name: POD_NAME
           valueFrom:
@@ -36,6 +38,14 @@ spec:
             memory: 400Mi
           requests:
             cpu: 200m
+      #   ports:
+      #   - name: metrics
+      #     containerPort: 7300
+      #     protocol: TCP
+      # readinessProbe:
+      #   httpGet:
+      #     path: /metrics
+      #     port: metrics
 ---
 apiVersion: v1
 kind: ServiceAccount

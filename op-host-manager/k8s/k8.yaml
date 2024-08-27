@@ -18,6 +18,8 @@ spec:
         name: op-host-manager
     spec:
       serviceAccountName: op-host-manager-sa
+      nodeSelector:
+        op-host-manager: "true"
       containers:
       - name: op-host-manager
         image: your-registry/node-labeler:v1
@@ -36,6 +38,14 @@ spec:
             memory: 400Mi
           requests:
             cpu: 200m
+      #   ports:
+      #   - name: metrics
+      #     containerPort: 7300
+      #     protocol: TCP
+      # readinessProbe:
+      #   httpGet:
+      #     path: /metrics
+      #     port: metrics
 ---
 apiVersion: v1
 kind: ServiceAccount

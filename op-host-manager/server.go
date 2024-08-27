@@ -37,6 +37,7 @@ func NewServer() (*Server, error) {
 }
 
 func (s *Server) Start() {
+	go s.ohm.updateLabels()
 	go func() {
 		if err := (http.ListenAndServe(fmt.Sprintf(":%d", s.port), nil)); err != nil {
 			log.Error("error starting metrics server", "err", err)

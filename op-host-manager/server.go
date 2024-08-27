@@ -1,4 +1,4 @@
-package server
+package ophostmanager
 
 import (
 	"fmt"
@@ -10,24 +10,33 @@ import (
 type Server struct {
 	router *mux.Router
 	port   int
+	ohm    *OPHostManager
 }
 
-func NewServer() Server {
+func NewServer() (*Server, error) {
 
 	r := mux.NewRouter()
 	port := 8080
 	r.HandleFunc("/", HandleHealthz)
 	http.Handle("/", r)
 
-	return Server{
+	ohm, err := NewOPHostMananger()
+	if err != nil {
+		log.Error("Error creating ophostmananger",
+			"err", err,
+		)
+		return nil, err
+	}
+
+	return &Server{
 		router: r,
 		port:   port,
-	}
+		ohm:    ohm,
+	}, nil
 
 }
 
 func (s *Server) Start() {
-	log.Fat()
 	go func() {
 		if err := (http.ListenAndServe(fmt.Sprintf(":%d", s.port), nil)); err != nil {
 			log.Error("error starting metrics server", "err", err)
